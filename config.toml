@@ -1,0 +1,15 @@
+# Streamlit theme for PipeSight AI dashboard.
+# Place this file at .streamlit/config.toml relative to wherever
+# `streamlit run dashboard.py` is invoked from (i.e. project root,
+# alongside dashboard.py) — Streamlit picks it up automatically, no
+# code changes needed in dashboard.py itself.
+
+[theme]
+primaryColor = "#0F62B0"              # Schneider-style blue — swap for exact brand hex if supplied
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F8"
+textColor = "#1A1A1A"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
