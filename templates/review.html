@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PipeSight — Tag Review</title>
+<style>
+  :root {
+    --ink: #1c2b2e;
+    --paper: #f6f4ef;
+    --card: #ffffff;
+    --line: #dcd7cb;
+    --accent: #b5502f;
+    --ok: #2f6e4f;
+    --warn: #b5502f;
+    --muted: #7a746a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--ink); color: var(--paper);
+    padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .02em; }
+  header .stats { font-size: 13px; opacity: .85; }
+  .toggle-row { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+  .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .page-group { margin-bottom: 32px; }
+  .page-title {
+    font-size: 15px; font-weight: 700; margin: 0 0 4px;
+    border-bottom: 2px solid var(--ink); padding-bottom: 6px;
+  }
+  .section-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 18px 0 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .bulk-btn {
+    font-size: 12px; padding: 4px 10px; border-radius: 4px;
+    border: 1px solid var(--ok); color: var(--ok); background: white; cursor: pointer;
+  }
+  .bulk-btn:hover { background: var(--ok); color: white; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+    padding: 12px; margin-bottom: 10px;
+    display: grid; grid-template-columns: 200px 1fr; gap: 14px;
+  }
+  .card.done { opacity: .4; }
+  .card img { width: 100%; border-radius: 4px; border: 1px solid var(--line); cursor: zoom-in; }
+  .crop-wrap { position: relative; }
+  .crop-wrap.editing img { user-select: none; }
+  .box-overlay {
+    position: absolute; border: 2px solid var(--accent);
+    background: rgba(181, 80, 47, 0.10); touch-action: none; cursor: move;
+  }
+  .box-handle {
+    position: absolute; width: 12px; height: 12px; background: var(--accent);
+    border: 1px solid white; border-radius: 2px; touch-action: none;
+  }
+  .box-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+  .box-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+  .box-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+  .box-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+  .box-edit-controls { margin-top: 6px; display: none; gap: 6px; }
+  .box-edit-controls.open { display: flex; }
+  .box-edit-controls button {
+    font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--line); background: white;
+  }
+  .box-edit-controls .save-box { border-color: var(--ok); color: var(--ok); }
+  .box-edit-controls .cancel-box { border-color: var(--muted); color: var(--muted); }
+  .img-missing {
+    display: none; align-items: center; justify-content: center; text-align: center;
+    height: 140px; border: 1px dashed var(--line); border-radius: 4px;
+    color: var(--muted); font-size: 12px; padding: 8px;
+  }
+  .crop-legend {
+    font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35;
+  }
+  .tag-line { font-size: 18px; font-weight: 700; font-family: "Consolas", monospace; }
+  .raw-line { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button {
+    font-size: 13px; padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--line); background: white;
+  }
+  .actions button.ok-btn { border-color: var(--ok); color: var(--ok); }
+  .actions button.ok-btn:hover { background: var(--ok); color: white; }
+  .actions button.no-btn { border-color: var(--warn); color: var(--warn); }
+  .actions button.no-btn:hover { background: var(--warn); color: white; }
+  .fix-row { margin-top: 8px; display: none; gap: 6px; }
+  .fix-row.open { display: flex; flex-wrap: wrap; }
+  .fix-row input, .fix-row select {
+    font-size: 13px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px;
+  }
+  .fix-row input { flex: 1; min-width: 140px; }
+  .fix-row .submit-fix { border-color: var(--accent); color: var(--accent); background: white; cursor: pointer; border-radius: 4px; padding: 5px 10px; }
+  .merge-info { margin-top: 6px; font-size: 12px; background: #f2ede1; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+  .merge-info .merge-note { font-weight: 600; margin-bottom: 4px; }
+  .merge-info .merge-readings { margin: 0; padding-left: 18px; }
+  .merge-info .reading-count { color: var(--muted); font-size: 11px; }
+  .technical { display: none; margin-top: 10px; font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+  body.show-technical .technical { display: block; }
+  .technical dt { font-weight: 600; display: inline; }
+  .technical dd { display: inline; margin: 0 12px 0 4px; }
+  #empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: 14px; }
+  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:10; text-align:center; }
+  #modal img { max-width: 95vw; max-height: 95vh; margin-top: 2vh; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PipeSight — Tag Review</h1>
+  <span class="stats" id="stats">Loading…</span>
+  <div class="toggle-row">
+    <label><input type="checkbox" id="technicalToggle"> Show technical details</label>
+  </div>
+</header>
+<main id="main"></main>
+<div id="modal" onclick="this.style.display='none'"><img id="modalimg"></div>
+
+<script>
+const REVIEWER = "sadhana";
+
+// When embedded in the dashboard for a single page's review (e.g.
+// /?page=SET%201_page_1), scope every fetch to that page instead of the
+// whole DB. Standalone use (no query param) is unaffected — same as
+// before. The backend already supported ?page= on /api/queue; this just
+// wires the frontend to pass it through, and adds the same support to
+// /api/stats so the header count matches what's actually shown.
+const PAGE_SCOPE = new URLSearchParams(location.search).get("page") || "";
+
+async function loadQueue() {
+  const url = PAGE_SCOPE ? `/api/queue?page=${encodeURIComponent(PAGE_SCOPE)}` : "/api/queue";
+  const res = await fetch(url);
+  const pages = await res.json();
+  render(pages);
+  loadStats();
+}
+
+async function loadStats() {
+  const url = PAGE_SCOPE ? `/api/stats?page=${encodeURIComponent(PAGE_SCOPE)}` : "/api/stats";
+  const res = await fetch(url);
+  const s = await res.json();
+  document.getElementById("stats").textContent =
+    `${s.total_remaining} remaining — ${s.needs_review_remaining} need a look, ${s.quick_confirm_remaining} quick confirms`;
+  if (s.total_remaining === 0) {
+    document.getElementById("main").innerHTML = '<div id="empty">Nothing left to review. New items will appear here as they come in.</div>';
+  }
+}
+
+function fmtNum(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  return isNaN(n) ? v : n.toFixed(2);
+}
+
+// Plain-language labels for the technical dropdown. Anything not listed
+// here falls back to the raw key with underscores swapped for spaces, so
+// adding a new technical_details field elsewhere never silently breaks
+// this — it just won't have a friendly label until added here.
+const TECHNICAL_FIELD_LABELS = {
+  ocr_conf: "Text-reading confidence",
+  reading_confidence: "Text-reading confidence",
+  yolo_conf: "Symbol-detection confidence",
+  detection_confidence: "Symbol-detection confidence",
+  combined_conf: "Overall confidence",
+  combined_confidence: "Overall confidence",
+  nearest_class_name: "Nearest symbol type",
+  nearest_routing: "Nearest symbol category",
+  nearest_dist_px: "Distance to nearest symbol (px)",
+  nearest_distance_px: "Distance to nearest symbol (px)",
+  class_name: "Symbol type",
+  class_id: "Symbol type ID",
+  det_id: "Detection ID",
+  tag_id: "Tag ID",
+  review_id: "Review item ID",
+  tag_status: "Internal status",
+  verification_method: "How this was confirmed",
+  raw_reading: "Raw text as read",
+  status: "Queue status",
+};
+
+function technicalLabel(key) {
+  return TECHNICAL_FIELD_LABELS[key] || key.replace(/_/g, " ");
+}
+
+function technicalBlock(tech) {
+  const rows = Object.entries(tech).map(([k, v]) => {
+    if (k === "bbox") return "";
+    const label = technicalLabel(k);
+    const val = typeof v === "number" ? fmtNum(v) : (v ?? "—");
+    return `<span><dt>${label}</dt><dd>${val}</dd></span>`;
+  }).join("");
+  return `<dl class="technical">${rows}</dl>`;
+}
+
+function mergedInfoHtml(item, mergedIds) {
+  const isMerged = mergedIds && mergedIds.length;
+  const readings = isMerged ? ((item.technical && item.technical.readings) || []) : [];
+  const counts = {};
+  readings.forEach(r => { counts[r] = (counts[r] || 0) + 1; });
+  const uniqueReadings = Object.keys(counts);
+  const readingsHtml = uniqueReadings.length
+    ? `<ul class="merge-readings">${uniqueReadings.map(r =>
+        `<li>${r}${counts[r] > 1 ? ` <span class="reading-count">(read this way ${counts[r]}×)</span>` : ""}</li>`
+      ).join("")}</ul>`
+    : "";
+  const noteHtml = item.note ? `<div class="merge-note">${item.note}</div>` : "";
+  if (!noteHtml && !readingsHtml) return "";
+  return `<div class="merge-info">${noteHtml}${readingsHtml}</div>`;
+}
+
+function cardHtml(item) {
+  const isTag = item.type === "TAG";
+  const okAction = isTag ? "ACCEPT" : "PROMOTE";
+  const noAction = isTag ? "REJECT" : "DISMISS";
+  const okLabel = item.actions[okAction];
+  const noLabel = item.actions[noAction];
+
+  let classSelect = "";
+  if (!isTag) {
+    classSelect = `<select class="fix-class" data-id="${item.id}">
+      ${item.class_options.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
+    </select>`;
+  }
+
+  // Merged near-duplicate clusters (see cluster_near_duplicates) only
+  // carry a DISMISS action — no single "as shown" text is correct when
+  // two OCR reads disagree, so there's no PROMOTE to offer here. Without
+  // this guard the button rendered anyway with an "undefined" label and
+  // failed every click (PROMOTE requires reviewer_tag/reviewer_class,
+  // which a plain click never supplies).
+  const okButtonHtml = okLabel
+    ? `<button class="ok-btn" onclick="quickAction('${item.id}','${okAction}')">${okLabel}</button>`
+    : "";
+
+  const mergedIds = Array.isArray(item.merged_ids) ? item.merged_ids : [];
+
+  // Box editing edits ONE specific box (see _editable_box_for_row server-
+  // side). For a merged cluster, item.id is always merged_ids[0] (see
+  // cluster_near_duplicates in review_server.py) — and api_action's
+  // PROMOTE-with-multiple-ids path only ever promotes ids[0], dismissing
+  // the rest as superseded, reading that row's bbox live at promote time.
+  // So there's no real ambiguity about which box this edits: it's the
+  // same row that ends up mattering either way. Offered on every card.
+  const adjustBoxBtn = `<button onclick="toggleBoxEdit('${item.id}')" id="adjustbtn-${item.id}">Adjust box</button>`;
+
+  // Same reasoning as adjustBoxBtn: spawning a second candidate off a
+  // merged cluster's page/bbox context is ambiguous (which of the
+  // cluster's readings' position should the clone start from?), so this
+  // is offered on every normal card but not merged ones.
+  const duplicateBtn = mergedIds.length
+    ? "" : `<button onclick="duplicateFinding('${item.id}')" title="Spotted another instrument in this same crop that nothing flagged? Add it here.">+ Found another one here</button>`;
+
+  return `
+  <div class="card" id="card-${item.id}" data-id="${item.id}" data-type="${item.type}" data-priority="${item.priority}" data-merged-ids="${mergedIds.join(',')}">
+    <div class="crop-wrap">
+      <img src="${item.crop_url}" onclick="openFull(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="img-missing">No crop image available</div>
+      ${isTag
+        ? '<div class="crop-legend">Red box = detected tag text<br>Gray box = related symbol</div>'
+        : (item.type === "REVIEW_QUEUE" && item.technical && item.technical.kind === "MISROUTED_CANDIDATE" && item.technical.nearest_class_name
+            ? '<div class="crop-legend">Red box = candidate tag text<br>Gray box = nearest symbol (possible match)</div>'
+            : '')}
+    </div>
+    <div class="box-edit-controls" id="boxctl-${item.id}">
+      <button class="save-box" onclick="saveBoxEdit('${item.id}')">Save box</button>
+      <button class="cancel-box" onclick="cancelBoxEdit('${item.id}')">Cancel</button>
+    </div>
+    <div>
+      <div class="tag-line">${item.tag}</div>
+      ${mergedIds.length ? "" : `<div class="raw-line">read as: "${item.raw_text || '—'}"</div>`}
+      ${mergedInfoHtml(item, mergedIds)}
+      <div class="actions">
+        ${okButtonHtml}
+        <button class="no-btn" onclick="quickAction('${item.id}','${noAction}')">${noLabel}</button>
+        <button onclick="toggleFix('${item.id}')">${isTag ? "Fix the text" : "It's real, but the text is wrong"}</button>
+        ${adjustBoxBtn}
+        ${duplicateBtn}
+      </div>
+      <div class="fix-row" id="fix-${item.id}">
+        <input type="text" placeholder="correct tag text" id="fixtext-${item.id}">
+        ${classSelect}
+        <button class="submit-fix" onclick="submitFix('${item.id}')">Save</button>
+      </div>
+      ${technicalBlock(item.technical)}
+    </div>
+  </div>`;
+}
+
+function render(pages) {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  Object.entries(pages).forEach(([page, items]) => {
+    const needsReview = items.filter(i => i.priority === "needs_review");
+    const quickConfirm = items.filter(i => i.priority === "quick_confirm");
+    if (!items.length) return;
+
+    let html = `<div class="page-group"><h2 class="page-title">${page}</h2>`;
+    if (needsReview.length) {
+      html += `<div class="section-label">Needs a look (${needsReview.length})</div>`;
+      html += needsReview.map(cardHtml).join("");
+    }
+    if (quickConfirm.length) {
+      html += `<div class="section-label">Quick confirms (${quickConfirm.length})
+        <button class="bulk-btn" onclick="confirmAll('${page}')">Confirm all as correct</button></div>`;
+      html += quickConfirm.map(cardHtml).join("");
+    }
+    html += `</div>`;
+    main.insertAdjacentHTML("beforeend", html);
+  });
+}
+
+async function postAction(id, action, extra) {
+  const card = document.getElementById(`card-${id}`);
+  const mergedIds = card && card.dataset.mergedIds
+    ? card.dataset.mergedIds.split(',').filter(Boolean)
+    : [];
+  const base = mergedIds.length
+    ? { ids: mergedIds, action, reviewer: REVIEWER }
+    : { id, action, reviewer: REVIEWER };
+  const body = Object.assign(base, extra || {});
+  const res = await fetch("/api/action", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!data.ok) { alert("Couldn't save: " + data.error); return false; }
+  if (card) card.classList.add("done");
+  return true;
+}
+
+async function quickAction(id, action) {
+  if (action === "PROMOTE") {
+    // Review-queue PROMOTE needs reviewer_tag + reviewer_class — the
+    // backend rejects it silently otherwise ("stale row, or missing
+    // required field", even though the row is fine). Use the candidate
+    // tag already shown on the card and default to field-mounted, same
+    // as confirmAll()'s bulk quick-confirm path below. If there's no
+    // real candidate text to promote, send the person to the explicit
+    // fix flow instead of firing a request that's guaranteed to fail.
+    const card = document.querySelector(`[data-id="${id}"]`);
+    const tag = card ? card.querySelector(".tag-line").textContent.trim() : "";
+    if (!tag || tag === "(unreadable)") {
+      toggleFix(id);
+      return;
+    }
+    await postAction(id, "PROMOTE", { reviewer_tag: tag, reviewer_class: "Instrument_Field" });
+  } else {
+    await postAction(id, action);
+  }
+  loadQueue();
+}
+
+function toggleFix(id) {
+  document.getElementById(`fix-${id}`).classList.toggle("open");
+}
+
+async function submitFix(id) {
+  const card = document.querySelector(`[data-id="${id}"]`);
+  const isTag = card.dataset.type === "TAG";
+  const text = document.getElementById(`fixtext-${id}`).value.trim();
+  if (!text) { alert("Enter the correct tag text first."); return; }
+  const extra = { reviewer_tag: text };
+  if (!isTag) {
+    const classEl = document.querySelector(`.fix-class[data-id="${id}"]`);
+    extra.reviewer_class = classEl.value;
+  }
+  const action = isTag ? "CORRECT" : "PROMOTE";
+  await postAction(id, action, extra);
+  loadQueue();
+}
+
+async function confirmAll(page) {
+  const cards = document.querySelectorAll(`.page-group h2`);
+  const items = Array.from(document.querySelectorAll(`.card[data-priority="quick_confirm"]`))
+    .filter(c => c.closest(".page-group").querySelector(".page-title").textContent === page);
+  for (const c of items) {
+    const id = c.dataset.id;
+    const action = c.dataset.type === "TAG" ? "ACCEPT" : "PROMOTE";
+    // MISROUTED_CANDIDATE quick-confirms are auto-PROMOTE using the
+    // OCR-read candidate tag as-is and defaulting to field-mounted, since
+    // the matching engine already found a tight spatial match.
+    if (action === "PROMOTE") {
+      const tag = c.querySelector(".tag-line").textContent;
+      await postAction(id, "PROMOTE", { reviewer_tag: tag, reviewer_class: "Instrument_Field" });
+    } else {
+      await postAction(id, "ACCEPT");
+    }
+  }
+  loadQueue();
+}
+
+// ── Box editing: drag/resize the highlighted box on a card's crop ──
+// Edit mode swaps the boxed display image for the raw (unboxed) crop and
+// overlays a plain absolutely-positioned div the reviewer can drag/resize,
+// since the normal image has the rectangle burned into the pixels.
+const boxEditState = {};
+
+function positionOverlay(el, left, top, width, height) {
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  el.style.width = `${width}px`;
+  el.style.height = `${height}px`;
+}
+
+async function toggleBoxEdit(id) {
+  const wrap = document.querySelector(`#card-${id} .crop-wrap`);
+  if (wrap.classList.contains("editing")) { cancelBoxEdit(id); return; }
+
+  // Lock BEFORE the await. The old code set "editing" only after the
+  // fetch resolved, leaving a window where a fast double-click (or a
+  // duplicate click/touch event) passes the guard above twice and starts
+  // two overlapping edit sessions — that's what was stacking extra boxes.
+  wrap.classList.add("editing");
+  document.getElementById(`boxctl-${id}`).classList.add("open");
+
+  const res = await fetch(`/api/crop_meta/${id}`);
+  const meta = await res.json();
+  if (!meta.ok) {
+    alert("Couldn't load the box for editing: " + meta.error);
+    wrap.classList.remove("editing");
+    document.getElementById(`boxctl-${id}`).classList.remove("open");
+    return;
+  }
+
+  const img = wrap.querySelector("img");
+  boxEditState[id] = { meta, origSrc: img.src };
+
+  // Defensive cleanup: clear any overlay already in this card (a failed
+  // save, a late/stale onload, etc.) before adding the new one — belt and
+  // suspenders alongside the lock above.
+  wrap.querySelectorAll(".box-overlay, .box-handle").forEach(el => el.remove());
+
+  img.onload = () => {
+    // Session may have been cancelled while the image was loading —
+    // don't add an overlay for an edit that's no longer active.
+    if (!wrap.classList.contains("editing")) return;
+    wrap.querySelectorAll(".box-overlay, .box-handle").forEach(el => el.remove());
+
+    const [ex1, ey1, ex2, ey2] = meta.editable_box;
+    const [cx1, cy1] = meta.crop_origin;
+    const scale = img.getBoundingClientRect().width / img.naturalWidth;
+
+    const overlay = document.createElement("div");
+    overlay.className = "box-overlay";
+    overlay.id = `overlay-${id}`;
+    positionOverlay(overlay, (ex1 - cx1) * scale, (ey1 - cy1) * scale,
+                     (ex2 - ex1) * scale, (ey2 - ey1) * scale);
+    ["nw", "ne", "sw", "se"].forEach(pos => {
+      const h = document.createElement("div");
+      h.className = `box-handle ${pos}`;
+      h.dataset.pos = pos;
+      overlay.appendChild(h);
+    });
+    wrap.appendChild(overlay);
+    wireDrag(overlay, img);
+  };
+  // Cache-bust: guarantees a real load event fires even if the browser
+  // has this exact URL cached from a previous edit session on this card.
+  img.src = `${meta.image_url}?t=${Date.now()}`;
+}
+
+function wireDrag(overlay, img) {
+  let mode = null, startX, startY, startBox;
+
+  const getBox = () => ({
+    left: parseFloat(overlay.style.left), top: parseFloat(overlay.style.top),
+    width: parseFloat(overlay.style.width), height: parseFloat(overlay.style.height),
+  });
+
+  function onMove(e) {
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    const bound = img.getBoundingClientRect();
+    let { left, top, width, height } = startBox;
+    if (mode === "move") {
+      left = Math.min(Math.max(0, startBox.left + dx), bound.width - width);
+      top = Math.min(Math.max(0, startBox.top + dy), bound.height - height);
+    } else {
+      if (mode.includes("e")) width = Math.max(10, Math.min(startBox.width + dx, bound.width - startBox.left));
+      if (mode.includes("s")) height = Math.max(10, Math.min(startBox.height + dy, bound.height - startBox.top));
+      if (mode.includes("w")) {
+        const newLeft = Math.max(0, startBox.left + dx);
+        width = Math.max(10, startBox.width - (newLeft - startBox.left));
+        left = newLeft;
+      }
+      if (mode.includes("n")) {
+        const newTop = Math.max(0, startBox.top + dy);
+        height = Math.max(10, startBox.height - (newTop - startBox.top));
+        top = newTop;
+      }
+    }
+    positionOverlay(overlay, left, top, width, height);
+  }
+
+  function onUp(e) {
+    if (overlay.hasPointerCapture(e.pointerId)) {
+      overlay.releasePointerCapture(e.pointerId);
+    }
+    mode = null;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+  }
+
+  overlay.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    overlay.setPointerCapture(e.pointerId);
+    mode = e.target.classList.contains("box-handle") ? e.target.dataset.pos : "move";
+    startX = e.clientX; startY = e.clientY; startBox = getBox();
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  });
+}
+
+async function saveBoxEdit(id) {
+  const state = boxEditState[id];
+  if (!state) return;
+  const wrap = document.querySelector(`#card-${id} .crop-wrap`);
+  const img = wrap.querySelector("img");
+  const overlay = document.getElementById(`overlay-${id}`);
+  const scale = img.getBoundingClientRect().width / img.naturalWidth;
+  const [cx1, cy1] = state.meta.crop_origin;
+  const left = parseFloat(overlay.style.left), top = parseFloat(overlay.style.top);
+  const width = parseFloat(overlay.style.width), height = parseFloat(overlay.style.height);
+
+  const x1 = Math.round(cx1 + left / scale);
+  const y1 = Math.round(cy1 + top / scale);
+  const x2 = Math.round(cx1 + (left + width) / scale);
+  const y2 = Math.round(cy1 + (top + height) / scale);
+
+  const res = await fetch("/api/bbox", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ id, x1, y1, x2, y2 }),
+  });
+  const data = await res.json();
+  if (!data.ok) { alert("Couldn't save the box: " + data.error); return; }
+
+  exitBoxEdit(id);
+  const [rowType, rawId] = id.startsWith("tag_") ? ["TAG", id.slice(4)] : ["REVIEW_QUEUE", id.slice(3)];
+  img.src = `/crop/${rowType}/${rawId}?t=${Date.now()}`;
+}
+
+function cancelBoxEdit(id) {
+  const state = boxEditState[id];
+  const wrap = document.querySelector(`#card-${id} .crop-wrap`);
+  if (state) wrap.querySelector("img").src = state.origSrc;
+  exitBoxEdit(id);
+}
+
+function exitBoxEdit(id) {
+  const wrap = document.querySelector(`#card-${id} .crop-wrap`);
+  wrap.classList.remove("editing");
+  document.getElementById(`boxctl-${id}`).classList.remove("open");
+
+  wrap.querySelectorAll(".box-overlay, .box-handle").forEach(el => el.remove());
+
+  delete boxEditState[id];
+}
+
+// ── Manual second finding: reviewer spotted an undetected instrument in
+// the same crop while working on a different card. Clones that card's
+// page/bbox into a new OPEN review_queue row server-side, then reuses the
+// normal box-edit flow so the reviewer drags the clone onto the real
+// instrument's position and fills in its tag via the usual fix-row/PROMOTE
+// path — no separate UI needed for that part.
+async function duplicateFinding(id) {
+  const res = await fetch("/api/duplicate_finding", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ id }),
+  });
+  const data = await res.json();
+  if (!data.ok) { alert("Couldn't add a new finding: " + data.error); return; }
+
+  await loadQueue();
+
+  // The new row is the newest thing in review_queue, so on a fresh
+  // render it naturally sorts to the very end of its section (e.g. dead
+  // last in a 40-item "Needs a look" list) — nowhere near the card the
+  // reviewer just spawned it from. Move it right after the source card
+  // instead, so it's actually adjacent, not just scrolled-to. Section
+  // counts above are computed from the underlying data before this move,
+  // so they stay accurate even if this crosses a needs-review/quick-
+  // confirm section boundary visually.
+  const sourceCard = document.getElementById(`card-${id}`);
+  const newCard = document.getElementById(`card-${data.new_id}`);
+  if (sourceCard && newCard) {
+    sourceCard.insertAdjacentElement("afterend", newCard);
+  }
+  if (newCard) {
+    newCard.scrollIntoView({ behavior: "smooth", block: "center" });
+    toggleBoxEdit(data.new_id);
+  }
+}
+
+function openFull(src) {
+  document.getElementById("modalimg").src = src;
+  document.getElementById("modal").style.display = "block";
+}
+
+document.getElementById("technicalToggle").addEventListener("change", (e) => {
+  document.body.classList.toggle("show-technical", e.target.checked);
+});
+
+loadQueue();
+setInterval(loadStats, 15000);
+</script>
+</body>
+</html>
